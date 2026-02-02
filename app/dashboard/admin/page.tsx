@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from "react";
 import MapWrapper from "@/components/MapWrapper";
-import { Users, Map as MapIcon, RefreshCw, Search, Filter } from "lucide-react";
+import { Users, Map as MapIcon, RefreshCw, Search, Filter, UserCog } from "lucide-react";
 import { cn } from "@/lib/utils";
+import UserManagement from "@/components/UserManagement";
 
 interface StudentLocation {
     id: string;
@@ -18,7 +19,7 @@ export default function AdminDashboard() {
     const [students, setStudents] = useState<StudentLocation[]>([]);
     const [loading, setLoading] = useState(true);
     const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
-    const [view, setView] = useState<"map" | "list">("map");
+    const [view, setView] = useState<"map" | "list" | "users">("map");
     const [mounted, setMounted] = useState(false);
 
     const fetchLocations = async () => {
@@ -87,6 +88,15 @@ export default function AdminDashboard() {
                             )}
                         >
                             List View
+                        </button>
+                        <button
+                            onClick={() => setView("users")}
+                            className={cn(
+                                "px-4 py-2 rounded-lg text-sm font-bold transition-all",
+                                view === "users" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                            )}
+                        >
+                            Users
                         </button>
                     </div>
                 </div>
@@ -170,6 +180,8 @@ export default function AdminDashboard() {
                         </button>
                     </div>
                 </div>
+                {/* Users Management View */}
+                {view === "users" && <UserManagement />}
             </main>
         </div>
     );
