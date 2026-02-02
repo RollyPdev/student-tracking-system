@@ -26,24 +26,43 @@ function SignInForm() {
         setLoading(true);
         setError("");
 
-        const result = await signIn("credentials", {
-            email,
-            password,
-            redirect: false,
-        });
+        try {
+            const result = await signIn("credentials", {
+                email,
+                password,
+                redirect: false,
+            });
 
-        if (result?.error) {
-            setError("Invalid email or password");
-            setLoading(false);
-        } else {
+            if (result?.error) {
+                setError("Invalid email or password");
+                setLoading(false);
+                return;
+            }
+
+            // Wait a moment for the session to be established
+            await new Promise(resolve => setTimeout(resolve, 100));
+
             // Get session to check role
             const session = await getSession();
+
+            if (!session) {
+                setError("Failed to establish session. Please try again.");
+                setLoading(false);
+                return;
+            }
 
             if (session?.user?.role === "ADMIN" || session?.user?.role === "TEACHER") {
                 router.push("/dashboard/admin");
             } else {
                 router.push("/dashboard/student");
             }
+
+            // Reset loading after navigation starts
+            setLoading(false);
+        } catch (err) {
+            console.error("Login error:", err);
+            setError("An unexpected error occurred. Please try again.");
+            setLoading(false);
         }
     };
 

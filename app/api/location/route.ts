@@ -52,11 +52,15 @@ export async function GET() {
             select: {
                 id: true,
                 name: true,
+                image: true,
+                school: true,
+                isSharing: true,
+                studentClass: true,
                 locationLogs: {
                     orderBy: {
                         timestamp: "desc",
                     },
-                    take: 1,
+                    take: 20,
                 },
                 studentProfile: {
                     include: {
@@ -68,15 +72,21 @@ export async function GET() {
 
         const formatted = latestLocations.map((u: any) => {
             const lastLoc = u.locationLogs[0];
+            if (!lastLoc) return null; // Skip users with no logs
+
             return {
                 id: u.id,
                 name: u.name || "Unknown",
                 lat: lastLoc.lat,
                 lng: lastLoc.lng,
                 timestamp: lastLoc.timestamp,
-                className: u.studentProfile?.class?.name || "N/A",
+                className: u.studentProfile?.class?.name || u.studentClass || "N/A",
+                isSharing: u.isSharing ?? false,
+                image: u.image,
+                school: u.school,
+                history: u.locationLogs.map((l: any) => [l.lat, l.lng]),
             };
-        });
+        }).filter(Boolean);
 
         return NextResponse.json(formatted);
     } catch (error) {

@@ -56,18 +56,19 @@ export default function Home() {
                     </div>
                 </div>
 
-                <div className="relative">
-                    <div className="absolute -inset-4 bg-blue-600/5 rounded-[3rem] blur-2xl"></div>
-                    <div className="relative bg-slate-900 rounded-[3rem] p-4 shadow-2xl overflow-hidden aspect-[4/3] flex items-center justify-center text-white">
-                        {/* Abstract Map UI */}
-                        <div className="absolute inset-0 opacity-20 bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                        <div className="relative z-10 flex flex-col items-center gap-6">
-                            <div className="h-20 w-20 bg-blue-600 rounded-3xl flex items-center justify-center animate-bounce shadow-2xl shadow-blue-500">
-                                <MapPin className="h-10 w-10" />
-                            </div>
-                            <div className="text-center">
-                                <p className="text-2xl font-bold">Live Tracking Demo</p>
-                                <p className="text-blue-400 font-medium">Precision: 5 meters</p>
+                <div className="relative group">
+                    <div className="absolute -inset-4 bg-blue-600/20 rounded-[3rem] blur-2xl group-hover:bg-blue-600/30 transition-all duration-700"></div>
+                    <div className="relative bg-slate-900 rounded-[3rem] p-2 shadow-2xl overflow-hidden aspect-[4/3] flex items-center justify-center">
+                        <img
+                            src="/map_hero_visualization_1770075290449.png"
+                            alt="Map Visualization"
+                            className="w-full h-full object-cover rounded-[2.5rem] opacity-90 group-hover:scale-105 transition-transform duration-1000"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-transparent to-transparent opacity-60"></div>
+                        <div className="absolute bottom-10 left-10 p-6 bg-white/10 backdrop-blur-md rounded-2xl border border-white/10">
+                            <div className="flex items-center gap-3">
+                                <div className="h-3 w-3 bg-emerald-500 rounded-full animate-pulse"></div>
+                                <p className="text-white font-bold text-sm tracking-wide uppercase">System Operational</p>
                             </div>
                         </div>
                     </div>

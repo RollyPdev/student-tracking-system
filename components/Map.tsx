@@ -1,6 +1,6 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useRef, useState, useMemo } from "react";
@@ -23,6 +23,11 @@ interface MarkerData {
     name: string;
     position: [number, number];
     lastSeen: string;
+    history?: [number, number][];
+    isSharing?: boolean;
+    image?: string | null;
+    school?: string | null;
+    className?: string;
 }
 
 interface MapProps {
@@ -44,28 +49,170 @@ function RecenterMap({ position }: { position: [number, number] }) {
 
     useEffect(() => {
         if (mountedRef.current && map) {
-            map.setView(position);
+            map.flyTo(position, map.getZoom());
         }
     }, [position, map]);
 
     return null;
 }
 
+// Component for individual marker with location fetching
+function MapMarkerWithLocation({ marker }: { marker: MarkerData }) {
+    const [locationName, setLocationName] = useState<string>("Loading location...");
+    const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+    const fetchedRef = useRef<string>("");
+
+    const fetchLocationName = async (lat: number, lng: number) => {
+        const cacheKey = `${lat.toFixed(4)},${lng.toFixed(4)}`;
+
+        // Don't refetch if we already have this location
+        if (fetchedRef.current === cacheKey) return;
+
+        setIsLoadingLocation(true);
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`,
+                {
+                    headers: {
+                        'Accept-Language': 'en',
+                        'User-Agent': 'StudentTrackingSystem/1.0'
+                    }
+                }
+            );
+
+            if (response.ok) {
+                const data = await response.json();
+
+                // Build a readable address from the response
+                const address = data.address;
+                let locationParts = [];
+
+                if (address.road) locationParts.push(address.road);
+                if (address.neighbourhood) locationParts.push(address.neighbourhood);
+                if (address.suburb) locationParts.push(address.suburb);
+                if (address.city || address.town || address.municipality) {
+                    locationParts.push(address.city || address.town || address.municipality);
+                }
+                if (address.state || address.region) locationParts.push(address.state || address.region);
+
+                const locationStr = locationParts.length > 0
+                    ? locationParts.slice(0, 3).join(", ")
+                    : data.display_name?.split(",").slice(0, 3).join(",") || "Unknown location";
+
+                setLocationName(locationStr);
+                fetchedRef.current = cacheKey;
+            } else {
+                setLocationName("Location unavailable");
+            }
+        } catch (error) {
+            console.error("Failed to fetch location:", error);
+            setLocationName("Location unavailable");
+        } finally {
+            setIsLoadingLocation(false);
+        }
+    };
+
+    // Fetch location when marker position changes
+    useEffect(() => {
+        fetchLocationName(marker.position[0], marker.position[1]);
+    }, [marker.position[0], marker.position[1]]);
+
+    const createCustomIcon = (image: string | null | undefined, isSharing: boolean = false) => {
+        if (image) {
+            return L.divIcon({
+                className: "custom-marker",
+                html: `
+                    <div class="relative group">
+                        <div class="w-12 h-12 rounded-full border-4 ${isSharing ? 'border-emerald-500 shadow-emerald-200' : 'border-slate-300 shadow-slate-200'} overflow-hidden shadow-lg bg-white box-border transition-transform transform group-hover:scale-110">
+                            <img src="${image}" class="w-full h-full object-cover" alt="Student" />
+                        </div>
+                        <div class="absolute -bottom-1 -right-1 w-4 h-4 ${isSharing ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'} rounded-full border-2 border-white"></div>
+                    </div>
+                `,
+                iconSize: [48, 48],
+                iconAnchor: [24, 24],
+                popupAnchor: [0, -28],
+            });
+        }
+        return DefaultIcon;
+    };
+
+    return (
+        <div>
+            {/* Movement History Trail */}
+            {marker.history && marker.history.length > 1 && (
+                <Polyline
+                    positions={marker.history}
+                    pathOptions={{
+                        color: marker.isSharing ? '#10b981' : '#94a3b8',
+                        weight: 4,
+                        opacity: 0.6,
+                        dashArray: marker.isSharing ? undefined : '5, 10'
+                    }}
+                />
+            )}
+
+            <Marker
+                position={marker.position}
+                icon={createCustomIcon(marker.image, marker.isSharing)}
+            >
+                <Popup>
+                    <div className="p-3 min-w-[220px]">
+                        <div className="flex items-center gap-3 mb-3 pb-3 border-b border-gray-100">
+                            {marker.image ? (
+                                <img src={marker.image} alt={marker.name} className="w-10 h-10 rounded-full object-cover border border-gray-200" />
+                            ) : (
+                                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold">
+                                    {marker.name.charAt(0)}
+                                </div>
+                            )}
+                            <div>
+                                <h3 className="font-bold text-gray-900 text-sm">{marker.name}</h3>
+                                <div className={`text-[10px] font-bold uppercase tracking-wider ${marker.isSharing ? 'text-emerald-600' : 'text-slate-400'}`}>
+                                    {marker.isSharing ? '• Live Tracking' : '• Offline'}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2 text-xs">
+                            <div className="grid grid-cols-[20px_1fr] items-center gap-1">
+                                <span className="text-gray-400">🏫</span>
+                                <span className="font-medium text-gray-700 truncate">{marker.school || "School not set"}</span>
+                            </div>
+                            <div className="grid grid-cols-[20px_1fr] items-center gap-1">
+                                <span className="text-gray-400">🎓</span>
+                                <span className="font-medium text-gray-700 truncate">{marker.className || "Class N/A"}</span>
+                            </div>
+                            <div className="grid grid-cols-[20px_1fr] items-start gap-1">
+                                <span className="text-gray-400">📍</span>
+                                <div>
+                                    <span className={`font-medium ${isLoadingLocation ? 'text-gray-400 italic' : 'text-gray-700'}`}>
+                                        {locationName}
+                                    </span>
+                                    <div className="text-gray-400 font-mono text-[10px] mt-0.5">
+                                        {marker.position[0].toFixed(5)}, {marker.position[1].toFixed(5)}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-[20px_1fr] items-center gap-1">
+                                <span className="text-gray-400">🕒</span>
+                                <span className="text-gray-500">{marker.lastSeen}</span>
+                            </div>
+                        </div>
+                    </div>
+                </Popup>
+            </Marker>
+        </div>
+    );
+}
+
 function MapMarkers({ markers }: { markers: MarkerData[] }) {
-    // Memoize markers to prevent unnecessary re-renders
     const memoizedMarkers = useMemo(() => markers, [JSON.stringify(markers)]);
 
     return (
         <>
             {memoizedMarkers.map((marker) => (
-                <Marker key={marker.id} position={marker.position}>
-                    <Popup>
-                        <div className="p-1">
-                            <h3 className="font-bold text-gray-900">{marker.name}</h3>
-                            <p className="text-xs text-gray-500">Last seen: {marker.lastSeen}</p>
-                        </div>
-                    </Popup>
-                </Marker>
+                <MapMarkerWithLocation key={marker.id} marker={marker} />
             ))}
         </>
     );
@@ -75,7 +222,6 @@ export default function Map({ center, zoom = 13, markers = [] }: MapProps) {
     const [mapReady, setMapReady] = useState(false);
     const mapRef = useRef<L.Map | null>(null);
 
-    // Memoize center to prevent unnecessary re-renders
     const memoizedCenter = useMemo(() => center, [center[0], center[1]]);
 
     return (

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession, signOut } from "next-auth/react";
 import MapWrapper from "@/components/MapWrapper";
-import { Users, Map as MapIcon, RefreshCw, Search, Filter, UserCog } from "lucide-react";
+import { Users, Map as MapIcon, RefreshCw, Search, Filter, UserCog, LogOut, Settings, X, Pencil } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserManagement from "@/components/UserManagement";
 
@@ -13,14 +14,30 @@ interface StudentLocation {
     lng: number;
     timestamp: string;
     className: string;
+    isSharing: boolean;
+    history?: [number, number][];
+    image?: string | null;
+    school?: string | null;
 }
 
 export default function AdminDashboard() {
+    const { data: session, update: updateSession } = useSession();
     const [students, setStudents] = useState<StudentLocation[]>([]);
     const [loading, setLoading] = useState(true);
     const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
-    const [view, setView] = useState<"map" | "list" | "users">("map");
+    const [view, setView] = useState<"map" | "list">("map");
     const [mounted, setMounted] = useState(false);
+    const [showProfileMenu, setShowProfileMenu] = useState(false);
+    const [showEditProfile, setShowEditProfile] = useState(false);
+    const [showUserManagement, setShowUserManagement] = useState(false);
+    const [profileForm, setProfileForm] = useState({
+        name: "",
+        email: "",
+        currentPassword: "",
+        newPassword: "",
+    });
+    const [profileMessage, setProfileMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+    const [savingProfile, setSavingProfile] = useState(false);
 
     const fetchLocations = async () => {
         try {
@@ -40,15 +57,66 @@ export default function AdminDashboard() {
     useEffect(() => {
         setMounted(true);
         fetchLocations();
-        const interval = setInterval(fetchLocations, 10000); // Poll every 10 seconds
+        const interval = setInterval(fetchLocations, 3000);
         return () => clearInterval(interval);
     }, []);
+
+    useEffect(() => {
+        if (session?.user) {
+            setProfileForm({
+                name: session.user.name || "",
+                email: session.user.email || "",
+                currentPassword: "",
+                newPassword: "",
+            });
+        }
+    }, [session]);
+
+    const handleLogout = () => {
+        signOut({ callbackUrl: "/auth/signin" });
+    };
+
+    const handleProfileSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setProfileMessage(null);
+        setSavingProfile(true);
+
+        try {
+            const res = await fetch("/api/admin/profile", {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(profileForm),
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                throw new Error(data.error || "Failed to update profile");
+            }
+
+            setProfileMessage({ type: "success", text: "Profile updated successfully!" });
+            await updateSession();
+            setTimeout(() => {
+                setShowEditProfile(false);
+                setProfileMessage(null);
+            }, 1500);
+        } catch (err: any) {
+            setProfileMessage({ type: "error", text: err.message });
+        } finally {
+            setSavingProfile(false);
+        }
+    };
 
     const markers = students.map((s) => ({
         id: s.id,
         name: s.name,
         position: [s.lat, s.lng] as [number, number],
         lastSeen: mounted ? new Date(s.timestamp).toLocaleTimeString() : "",
+        isSharing: s.isSharing,
+        history: s.history,
+        image: s.image,
+        school: s.school,
+        className: s.className,
     }));
 
     return (
@@ -70,6 +138,8 @@ export default function AdminDashboard() {
                         <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
                         Last update: {mounted ? lastRefreshed.toLocaleTimeString() : "--:--:--"}
                     </div>
+
+                    {/* View Toggle */}
                     <div className="flex bg-slate-100 p-1 rounded-xl">
                         <button
                             onClick={() => setView("map")}
@@ -89,15 +159,65 @@ export default function AdminDashboard() {
                         >
                             List View
                         </button>
+                    </div>
+
+                    {/* User Management Button */}
+                    <button
+                        onClick={() => setShowUserManagement(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-purple-200"
+                    >
+                        <UserCog className="h-4 w-4" />
+                        <span className="hidden md:inline">Manage Users</span>
+                    </button>
+
+                    {/* Profile Menu */}
+                    <div className="relative">
                         <button
-                            onClick={() => setView("users")}
-                            className={cn(
-                                "px-4 py-2 rounded-lg text-sm font-bold transition-all",
-                                view === "users" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
-                            )}
+                            onClick={() => setShowProfileMenu(!showProfileMenu)}
+                            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
                         >
-                            Users
+                            <div className="h-8 w-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
+                                {session?.user?.name?.charAt(0) || "A"}
+                            </div>
+                            <div className="hidden md:block text-left">
+                                <p className="text-sm font-bold text-slate-900">{session?.user?.name || "Admin"}</p>
+                                <p className="text-[10px] text-slate-500 uppercase font-bold">{session?.user?.role || "Admin"}</p>
+                            </div>
                         </button>
+
+                        {showProfileMenu && (
+                            <>
+                                <div
+                                    className="fixed inset-0 z-40"
+                                    onClick={() => setShowProfileMenu(false)}
+                                />
+                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                                    <div className="px-4 py-3 border-b border-slate-100">
+                                        <p className="text-sm font-bold text-slate-900">{session?.user?.name}</p>
+                                        <p className="text-xs text-slate-500">{session?.user?.email}</p>
+                                    </div>
+                                    <div className="p-2">
+                                        <button
+                                            onClick={() => {
+                                                setShowProfileMenu(false);
+                                                setShowEditProfile(true);
+                                            }}
+                                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 rounded-xl transition-colors font-medium"
+                                        >
+                                            <Pencil className="h-4 w-4" />
+                                            Edit Profile
+                                        </button>
+                                        <button
+                                            onClick={handleLogout}
+                                            className="w-full flex items-center gap-3 px-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-xl transition-colors font-medium"
+                                        >
+                                            <LogOut className="h-4 w-4" />
+                                            Sign Out
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </header>
@@ -143,7 +263,15 @@ export default function AdminDashboard() {
                                         <p className="text-xs text-slate-500 font-medium">Class: {student.className}</p>
                                     </div>
                                     <div className="text-right">
-                                        <p className="text-[10px] uppercase font-bold text-emerald-500">Live</p>
+                                        <div className="flex items-center justify-end gap-1">
+                                            <div className={cn("h-1.5 w-1.5 rounded-full", student.isSharing ? "bg-emerald-500 animate-pulse" : "bg-slate-300")} />
+                                            <p className={cn(
+                                                "text-[10px] uppercase font-bold",
+                                                student.isSharing ? "text-emerald-500" : "text-slate-400"
+                                            )}>
+                                                {student.isSharing ? "Live" : "Offline"}
+                                            </p>
+                                        </div>
                                         <p className="text-[10px] text-slate-400">{mounted ? new Date(student.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "--:--"}</p>
                                     </div>
                                 </div>
@@ -180,9 +308,131 @@ export default function AdminDashboard() {
                         </button>
                     </div>
                 </div>
-                {/* Users Management View */}
-                {view === "users" && <UserManagement />}
             </main>
+
+            {/* User Management Modal */}
+            {showUserManagement && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden animate-in zoom-in-95">
+                        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-purple-600 p-2 rounded-xl">
+                                    <UserCog className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-900">User Management</h2>
+                                    <p className="text-xs text-slate-500">Create, edit, and manage user accounts</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => setShowUserManagement(false)}
+                                className="p-2 hover:bg-slate-200 rounded-lg transition-colors"
+                            >
+                                <X className="h-5 w-5 text-slate-500" />
+                            </button>
+                        </div>
+                        <div className="overflow-auto max-h-[calc(90vh-80px)]">
+                            <UserManagement />
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Edit Profile Modal */}
+            {showEditProfile && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 animate-in zoom-in-95">
+                        <div className="flex items-center justify-between mb-6">
+                            <h3 className="text-xl font-bold text-slate-900">Edit Profile</h3>
+                            <button
+                                onClick={() => {
+                                    setShowEditProfile(false);
+                                    setProfileMessage(null);
+                                }}
+                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                            >
+                                <X className="h-5 w-5 text-slate-500" />
+                            </button>
+                        </div>
+
+                        {profileMessage && (
+                            <div className={cn(
+                                "p-3 rounded-xl mb-4 text-sm font-medium",
+                                profileMessage.type === "success" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"
+                            )}>
+                                {profileMessage.text}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleProfileSubmit} className="space-y-4">
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">Full Name</label>
+                                <input
+                                    required
+                                    type="text"
+                                    value={profileForm.name}
+                                    onChange={(e) => setProfileForm({ ...profileForm, name: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">Email Address</label>
+                                <input
+                                    required
+                                    type="email"
+                                    value={profileForm.email}
+                                    onChange={(e) => setProfileForm({ ...profileForm, email: e.target.value })}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all"
+                                />
+                            </div>
+                            <div className="border-t border-slate-100 pt-4 mt-4">
+                                <p className="text-sm font-bold text-slate-700 mb-4">Change Password (optional)</p>
+                                <div className="space-y-4">
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-600">Current Password</label>
+                                        <input
+                                            type="password"
+                                            value={profileForm.currentPassword}
+                                            onChange={(e) => setProfileForm({ ...profileForm, currentPassword: e.target.value })}
+                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all"
+                                            placeholder="Enter current password"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-sm font-medium text-slate-600">New Password</label>
+                                        <input
+                                            type="password"
+                                            value={profileForm.newPassword}
+                                            onChange={(e) => setProfileForm({ ...profileForm, newPassword: e.target.value })}
+                                            className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-blue-50 focus:border-blue-500 outline-none transition-all"
+                                            placeholder="Min. 6 characters"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowEditProfile(false);
+                                        setProfileMessage(null);
+                                    }}
+                                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={savingProfile}
+                                    className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all disabled:opacity-50"
+                                >
+                                    {savingProfile ? "Saving..." : "Save Changes"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

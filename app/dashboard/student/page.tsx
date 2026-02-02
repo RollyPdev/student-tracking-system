@@ -9,6 +9,7 @@ export default function StudentDashboard() {
     const { data: session } = useSession();
     const [isTracking, setIsTracking] = useState(false);
     const [location, setLocation] = useState<{ lat: number; lng: number; accuracy?: number } | null>(null);
+    const [address, setAddress] = useState<string | null>(null);
     const [lastSync, setLastSync] = useState<Date | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
@@ -39,6 +40,13 @@ export default function StudentDashboard() {
         setIsTracking(true);
         setError(null);
 
+        // Update status to online
+        fetch("/api/status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isSharing: true }),
+        }).catch(err => console.error("Failed to update status:", err));
+
         watchId.current = navigator.geolocation.watchPosition(
             async (position) => {
                 const { latitude, longitude, accuracy } = position.coords;
@@ -47,6 +55,7 @@ export default function StudentDashboard() {
 
                 // Send to server
                 try {
+                    fetchAddress(latitude, longitude);
                     await fetch("/api/location", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
@@ -87,12 +96,38 @@ export default function StudentDashboard() {
         );
     };
 
+    const fetchAddress = async (lat: number, lng: number) => {
+        try {
+            const response = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18`
+            );
+            if (response.ok) {
+                const data = await response.json();
+                const addr = data.address;
+                const parts = [];
+                if (addr.road) parts.push(addr.road);
+                if (addr.neighbourhood) parts.push(addr.neighbourhood);
+                if (addr.city || addr.town) parts.push(addr.city || addr.town);
+                setAddress(parts.join(", ") || "Unknown Location");
+            }
+        } catch (err) {
+            console.error("Failed to fetch address:", err);
+        }
+    };
+
     const stopTracking = () => {
         if (watchId.current !== null) {
             navigator.geolocation.clearWatch(watchId.current);
             watchId.current = null;
         }
         setIsTracking(false);
+
+        // Update status to offline
+        fetch("/api/status", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ isSharing: false }),
+        }).catch(err => console.error("Failed to update status:", err));
     };
 
     useEffect(() => {
@@ -195,6 +230,27 @@ export default function StudentDashboard() {
                 </div>
 
                 {/* Stats Grid */}
+                <div className="grid grid-cols-1 gap-4">
+                    <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-3">
+                        <div className="flex items-center justify-between">
+                            <div className="p-2 bg-blue-50 rounded-xl w-fit">
+                                <MapPin className="h-5 w-5 text-blue-600" />
+                            </div>
+                            {location && (
+                                <span className="text-[10px] font-mono text-slate-400">
+                                    {location.lat.toFixed(5)}, {location.lng.toFixed(5)}
+                                </span>
+                            )}
+                        </div>
+                        <div>
+                            <p className="text-xs text-slate-500 font-medium uppercase tracking-wider text-[10px]">Current Location</p>
+                            <p className="text-lg font-bold text-slate-900 mt-1">
+                                {isTracking ? (address || "Fetching address...") : "Tracking Paused"}
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="grid grid-cols-2 gap-4">
                     <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 space-y-3">
                         <div className="p-2 bg-purple-50 rounded-xl w-fit">

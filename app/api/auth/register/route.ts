@@ -9,9 +9,11 @@ export async function POST(req: NextRequest) {
         const email = body.email?.toLowerCase().trim(); // Normalize email to lowercase
         const password = body.password;
         const studentClass = body.studentClass;
+        const school = body.school;
+        const image = body.image;
 
         // Validation
-        if (!name || !email || !password || !studentClass) {
+        if (!name || !email || !password || !studentClass || !school) {
             return NextResponse.json(
                 { error: "All fields are required" },
                 { status: 400 }
@@ -48,6 +50,8 @@ export async function POST(req: NextRequest) {
                 password: hashedPassword,
                 role: "STUDENT",
                 studentClass,
+                school,
+                image,
             } as any,
         });
 

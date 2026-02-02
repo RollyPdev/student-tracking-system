@@ -6,11 +6,14 @@ import { MapPin, User, Mail, Lock, ArrowRight, Loader2, UserPlus } from "lucide-
 import Link from "next/link";
 
 export default function SignUp() {
+
     const [fullName, setFullName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [studentClass, setStudentClass] = useState("");
+    const [school, setSchool] = useState("");
+    const [image, setImage] = useState<string | null>(null);
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -21,7 +24,7 @@ export default function SignUp() {
         setError("");
 
         // Validation
-        if (!fullName || !email || !password || !studentClass) {
+        if (!fullName || !email || !password || !studentClass || !school) {
             setError("All fields are required");
             setLoading(false);
             return;
@@ -48,6 +51,8 @@ export default function SignUp() {
                     email,
                     password,
                     studentClass,
+                    school,
+                    image, // Sending base64 string
                 }),
             });
 
@@ -102,6 +107,27 @@ export default function SignUp() {
                             </div>
 
                             <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700 ml-1">Profile Picture</label>
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                const reader = new FileReader();
+                                                reader.onloadend = () => {
+                                                    setImage(reader.result as string);
+                                                };
+                                                reader.readAsDataURL(file);
+                                            }
+                                        }}
+                                        className="w-full pl-4 pr-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all text-slate-900 font-medium file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
                                 <label className="text-sm font-bold text-slate-700 ml-1">Email Address</label>
                                 <div className="relative">
                                     <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400" />
@@ -135,6 +161,23 @@ export default function SignUp() {
                                     <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                                         <ArrowRight className="h-4 w-4 rotate-90" />
                                     </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700 ml-1">School</label>
+                                <div className="relative">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none">
+                                        <MapPin className="h-5 w-5" />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        value={school}
+                                        onChange={(e) => setSchool(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all text-slate-900 font-medium"
+                                        placeholder="Enter your school name"
+                                        required
+                                    />
                                 </div>
                             </div>
 
