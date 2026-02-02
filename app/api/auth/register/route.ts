@@ -4,7 +4,11 @@ import bcrypt from "bcryptjs";
 
 export async function POST(req: NextRequest) {
     try {
-        const { name, email, password, studentClass } = await req.json();
+        const body = await req.json();
+        const name = body.name;
+        const email = body.email?.toLowerCase().trim(); // Normalize email to lowercase
+        const password = body.password;
+        const studentClass = body.studentClass;
 
         // Validation
         if (!name || !email || !password || !studentClass) {
