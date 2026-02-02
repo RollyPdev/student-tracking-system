@@ -10,6 +10,7 @@ export default function SignUp() {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
+    const [studentClass, setStudentClass] = useState("");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(false);
     const router = useRouter();
@@ -20,7 +21,7 @@ export default function SignUp() {
         setError("");
 
         // Validation
-        if (!fullName || !email || !password) {
+        if (!fullName || !email || !password || !studentClass) {
             setError("All fields are required");
             setLoading(false);
             return;
@@ -46,6 +47,7 @@ export default function SignUp() {
                     name: fullName,
                     email,
                     password,
+                    studentClass,
                 }),
             });
 
@@ -111,6 +113,28 @@ export default function SignUp() {
                                         placeholder="name@example.com"
                                         required
                                     />
+                                </div>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700 ml-1">Class</label>
+                                <div className="relative">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-slate-400 pointer-events-none">
+                                        <User className="h-5 w-5" />
+                                    </div>
+                                    <select
+                                        value={studentClass}
+                                        onChange={(e) => setStudentClass(e.target.value)}
+                                        className="w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-emerald-500 transition-all text-slate-900 font-medium appearance-none"
+                                        required
+                                    >
+                                        <option value="" disabled>Select your class</option>
+                                        <option value="Board Exam Takers for Criminologist">Board Exam Takers for Criminologist</option>
+                                        <option value="Student">Student</option>
+                                    </select>
+                                    <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
+                                        <ArrowRight className="h-4 w-4 rotate-90" />
+                                    </div>
                                 </div>
                             </div>
 

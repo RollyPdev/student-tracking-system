@@ -4,10 +4,10 @@ import bcrypt from "bcrypt";
 
 export async function POST(req: NextRequest) {
     try {
-        const { name, email, password } = await req.json();
+        const { name, email, password, studentClass } = await req.json();
 
         // Validation
-        if (!name || !email || !password) {
+        if (!name || !email || !password || !studentClass) {
             return NextResponse.json(
                 { error: "All fields are required" },
                 { status: 400 }
@@ -43,7 +43,8 @@ export async function POST(req: NextRequest) {
                 email,
                 password: hashedPassword,
                 role: "STUDENT",
-            },
+                studentClass,
+            } as any,
         });
 
         // Create student profile
