@@ -60,7 +60,7 @@ export async function GET() {
                     orderBy: {
                         timestamp: "desc",
                     },
-                    take: 50,
+                    take: 200,
                 },
                 studentProfile: {
                     include: {

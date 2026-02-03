@@ -1,6 +1,6 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, CircleMarker } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useRef, useState, useMemo } from "react";
@@ -141,16 +141,31 @@ function MapMarkerWithLocation({ marker }: { marker: MarkerData }) {
         <>
             {/* Movement History Trail */}
             {marker.history && marker.history.length > 1 && (
-                <Polyline
-                    positions={marker.history}
-                    smoothFactor={1}
-                    pathOptions={{
-                        color: marker.isSharing ? '#10b981' : '#94a3b8',
-                        weight: 6,
-                        opacity: 0.8,
-                        dashArray: marker.isSharing ? undefined : '5, 10'
-                    }}
-                />
+                <>
+                    <Polyline
+                        positions={marker.history}
+                        smoothFactor={1}
+                        pathOptions={{
+                            color: marker.isSharing ? '#10b981' : '#94a3b8',
+                            weight: 6,
+                            opacity: 0.8,
+                            dashArray: marker.isSharing ? undefined : '5, 10'
+                        }}
+                    />
+                    {/* Journey Start Point */}
+                    <CircleMarker
+                        center={marker.history[0]}
+                        radius={5}
+                        pathOptions={{
+                            fillColor: '#ef4444',
+                            color: 'white',
+                            weight: 2,
+                            fillOpacity: 1
+                        }}
+                    >
+                        <Popup>Journey started here</Popup>
+                    </CircleMarker>
+                </>
             )}
 
             <Marker

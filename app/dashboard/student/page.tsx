@@ -14,6 +14,7 @@ export default function StudentDashboard() {
     const [error, setError] = useState<string | null>(null);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const watchId = useRef<number | null>(null);
+    const lastSentLocation = useRef<{ lat: number; lng: number } | null>(null);
 
     const startTracking = () => {
         // Check if running in a secure context (HTTPS or localhost)
@@ -53,20 +54,27 @@ export default function StudentDashboard() {
                 setLocation({ lat: latitude, lng: longitude, accuracy });
                 setLastSync(new Date());
 
-                // Send to server
-                try {
-                    fetchAddress(latitude, longitude);
-                    await fetch("/api/location", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({
-                            lat: latitude,
-                            lng: longitude,
-                            accuracy,
-                        }),
-                    });
-                } catch (err) {
-                    console.error("Failed to sync location:", err);
+                // Only send if moved significantly (> 0.0001 degrees, approx 11 meters)
+                const hasMoved = !lastSentLocation.current ||
+                    Math.abs(lastSentLocation.current.lat - latitude) > 0.0001 ||
+                    Math.abs(lastSentLocation.current.lng - longitude) > 0.0001;
+
+                if (hasMoved) {
+                    try {
+                        fetchAddress(latitude, longitude);
+                        await fetch("/api/location", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                                lat: latitude,
+                                lng: longitude,
+                                accuracy,
+                            }),
+                        });
+                        lastSentLocation.current = { lat: latitude, lng: longitude };
+                    } catch (err) {
+                        console.error("Failed to sync location:", err);
+                    }
                 }
             },
             (err) => {
