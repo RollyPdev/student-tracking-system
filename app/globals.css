@@ -124,3 +124,9 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Smooth marker movement */
+.leaflet-container:not(.leaflet-zoom-anim) .leaflet-marker-icon,
+.leaflet-container:not(.leaflet-zoom-anim) .leaflet-marker-shadow {
+  transition: transform 1s linear;
+}

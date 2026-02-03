@@ -113,8 +113,13 @@ function MapMarkerWithLocation({ marker }: { marker: MarkerData }) {
     };
 
     // Fetch location when marker position changes
+    // Fetch location when marker position changes (Debounced)
     useEffect(() => {
-        fetchLocationName(marker.position[0], marker.position[1]);
+        const timer = setTimeout(() => {
+            fetchLocationName(marker.position[0], marker.position[1]);
+        }, 1000); // 1s delay to prevent spamming the API while moving
+
+        return () => clearTimeout(timer);
     }, [marker.position[0], marker.position[1]]);
 
     const createCustomIcon = (image: string | null | undefined, isSharing: boolean = false) => {
