@@ -122,7 +122,7 @@ export default function AdminDashboard() {
     return (
         <div className="h-screen flex flex-col bg-slate-50 overflow-hidden">
             {/* Top Navbar */}
-            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0">
+            <header className="bg-white border-b border-slate-200 px-6 py-4 flex items-center justify-between flex-shrink-0 relative z-[1000]">
                 <div className="flex items-center gap-3">
                     <div className="bg-blue-600 p-2 rounded-xl">
                         <MapIcon className="h-6 w-6 text-white" />
@@ -188,10 +188,10 @@ export default function AdminDashboard() {
                         {showProfileMenu && (
                             <>
                                 <div
-                                    className="fixed inset-0 z-40"
+                                    className="fixed inset-0 z-[1001]"
                                     onClick={() => setShowProfileMenu(false)}
                                 />
-                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-50 animate-in fade-in slide-in-from-top-2">
+                                <div className="absolute right-0 mt-2 w-64 bg-white rounded-2xl shadow-2xl border border-slate-100 py-2 z-[1002] animate-in fade-in slide-in-from-top-2">
                                     <div className="px-4 py-3 border-b border-slate-100">
                                         <p className="text-sm font-bold text-slate-900">{session?.user?.name}</p>
                                         <p className="text-xs text-slate-500">{session?.user?.email}</p>
