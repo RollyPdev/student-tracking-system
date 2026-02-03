@@ -60,7 +60,7 @@ export async function GET() {
                     orderBy: {
                         timestamp: "desc",
                     },
-                    take: 20,
+                    take: 50,
                 },
                 studentProfile: {
                     include: {
@@ -74,6 +74,11 @@ export async function GET() {
             const lastLoc = u.locationLogs[0];
             if (!lastLoc) return null; // Skip users with no logs
 
+            // Reverse logs for history to go from oldest to newest
+            const history = [...u.locationLogs]
+                .reverse()
+                .map((l: any) => [l.lat, l.lng]);
+
             return {
                 id: u.id,
                 name: u.name || "Unknown",
@@ -84,7 +89,7 @@ export async function GET() {
                 isSharing: u.isSharing ?? false,
                 image: u.image,
                 school: u.school,
-                history: u.locationLogs.map((l: any) => [l.lat, l.lng]),
+                history: history,
             };
         }).filter(Boolean);
 

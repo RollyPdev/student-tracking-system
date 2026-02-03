@@ -138,15 +138,16 @@ function MapMarkerWithLocation({ marker }: { marker: MarkerData }) {
     };
 
     return (
-        <div>
+        <>
             {/* Movement History Trail */}
             {marker.history && marker.history.length > 1 && (
                 <Polyline
                     positions={marker.history}
+                    smoothFactor={1}
                     pathOptions={{
                         color: marker.isSharing ? '#10b981' : '#94a3b8',
-                        weight: 4,
-                        opacity: 0.6,
+                        weight: 6,
+                        opacity: 0.8,
                         dashArray: marker.isSharing ? undefined : '5, 10'
                     }}
                 />
@@ -202,7 +203,7 @@ function MapMarkerWithLocation({ marker }: { marker: MarkerData }) {
                     </div>
                 </Popup>
             </Marker>
-        </div>
+        </>
     );
 }
 
