@@ -38,6 +38,7 @@ export default function AdminDashboard() {
     });
     const [profileMessage, setProfileMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [savingProfile, setSavingProfile] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
     const fetchLocations = async () => {
         try {
@@ -127,9 +128,18 @@ export default function AdminDashboard() {
                     <div className="bg-blue-600 p-2 rounded-xl">
                         <MapIcon className="h-6 w-6 text-white" />
                     </div>
-                    <div>
-                        <h1 className="text-xl font-bold text-slate-900">Live Student Tracker</h1>
-                        <p className="text-xs text-slate-500 font-medium">Monitoring {students.length} active students</p>
+                    <div className="flex items-center gap-3">
+                        <button
+                            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                            className="hidden lg:flex p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 transition-colors"
+                            title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+                        >
+                            <Users className={cn("h-5 w-5 transition-transform", sidebarCollapsed ? "rotate-180" : "")} />
+                        </button>
+                        <div>
+                            <h1 className="text-xl font-bold text-slate-900 leading-none">Live Student Tracker</h1>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-tight mt-1">Monitoring {students.length} active students</p>
+                        </div>
                     </div>
                 </div>
 
@@ -225,8 +235,9 @@ export default function AdminDashboard() {
             <main className="flex-1 flex overflow-hidden">
                 {/* Sidebar for student list (on desktop Map view) */}
                 <div className={cn(
-                    "w-80 bg-white border-r border-slate-200 flex flex-col transition-all duration-300",
-                    view === "list" ? "w-full" : "hidden lg:flex"
+                    "bg-white border-r border-slate-200 flex flex-col transition-all duration-300 ease-in-out relative",
+                    view === "list" ? "w-full" : (sidebarCollapsed ? "w-0 overflow-hidden lg:w-0 border-none" : "w-full lg:w-80"),
+                    view === "map" && "hidden lg:flex"
                 )}>
                     <div className="p-4 border-b border-slate-100 flex gap-2">
                         <div className="relative flex-1">
@@ -282,9 +293,20 @@ export default function AdminDashboard() {
 
                 {/* Map Area */}
                 <div className={cn(
-                    "flex-1 relative",
+                    "flex-1 relative transition-all duration-300",
                     view === "list" && "hidden"
                 )}>
+                    {/* Floating Expand Sidebar Button (only when collapsed) */}
+                    {sidebarCollapsed && view === "map" && (
+                        <button
+                            onClick={() => setSidebarCollapsed(false)}
+                            className="absolute left-4 top-4 z-[500] bg-white p-3 rounded-2xl shadow-xl border border-slate-100 text-blue-600 hover:bg-blue-50 transition-all animate-in slide-in-from-left-4"
+                            title="Expand Student List"
+                        >
+                            <Users className="h-5 w-5" />
+                        </button>
+                    )}
+
                     {students.length > 0 ? (
                         <MapWrapper
                             center={[students[0].lat, students[0].lng]}
