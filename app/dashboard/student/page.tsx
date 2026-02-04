@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { MapPin, Power, Cloud, Navigation, History, Shield, LogOut, User } from "lucide-react";
+import { MapPin, Power, Cloud, Navigation, History, Shield, LogOut, User, Bell, X, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function StudentDashboard() {
@@ -14,7 +14,55 @@ export default function StudentDashboard() {
     const [error, setError] = useState<string | null>(null);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
     const watchId = useRef<number | null>(null);
-    const lastSentLocation = useRef<{ lat: number; lng: number } | null>(null);
+    const lastSentLocation = useRef<{ lat: number; lng: number; time: number } | null>(null);
+
+    // Notification State
+    const [notifications, setNotifications] = useState<any[]>([]);
+    const [showNotifications, setShowNotifications] = useState(false);
+    const [unreadCount, setUnreadCount] = useState(0);
+
+    // Fetch notifications periodically
+    useEffect(() => {
+        const fetchNotifications = async () => {
+            try {
+                const res = await fetch("/api/notifications");
+                if (res.ok) {
+                    const data = await res.json();
+                    setNotifications(data);
+                    setUnreadCount(data.filter((n: any) => !n.isRead).length);
+                }
+            } catch (err) {
+                console.error("Failed to fetch notifications:", err);
+            }
+        };
+
+        fetchNotifications();
+        const interval = setInterval(fetchNotifications, 10000); // Poll every 10s
+        return () => clearInterval(interval);
+    }, []);
+
+    // Register Push Notifications
+    useEffect(() => {
+        if ('serviceWorker' in navigator && 'PushManager' in window) {
+            import('@/lib/push').then(async ({ registerServiceWorker, subscribeUserToPush }) => {
+                await registerServiceWorker();
+                // Replace with your VAPID public key
+                const publicKey = 'BMsw-kEivG7iDDvQ1ZBcgjow0x12WidnMSEjk-tDUp7U-hctBMKidennFS_mBsB7oBuZX4UKGgTvTDpS30PCT6Y';
+                await subscribeUserToPush(publicKey);
+            });
+        }
+    }, [session]);
+
+    const markAsRead = async (id: string) => {
+        try {
+            await fetch(`/api/notifications/${id}/read`, { method: "PUT" });
+            // Optimistic update
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, isRead: true } : n));
+            setUnreadCount(prev => Math.max(0, prev - 1));
+        } catch (err) {
+            console.error(err);
+        }
+    };
 
     const startTracking = () => {
         // Check if running in a secure context (HTTPS or localhost)
@@ -54,12 +102,17 @@ export default function StudentDashboard() {
                 setLocation({ lat: latitude, lng: longitude, accuracy });
                 setLastSync(new Date());
 
-                // Only send if moved significantly (> 0.0001 degrees, approx 11 meters)
-                const hasMoved = !lastSentLocation.current ||
-                    Math.abs(lastSentLocation.current.lat - latitude) > 0.0001 ||
-                    Math.abs(lastSentLocation.current.lng - longitude) > 0.0001;
+                // Always send the first location, or if moved significantly (> 0.0001 degrees, approx 11 meters)
+                const isFirstLocation = !lastSentLocation.current;
+                const hasMoved = isFirstLocation ||
+                    Math.abs(lastSentLocation.current!.lat - latitude) > 0.0001 ||
+                    Math.abs(lastSentLocation.current!.lng - longitude) > 0.0001;
 
-                if (hasMoved) {
+                // Also send periodic heartbeat every 30 seconds even without movement
+                const lastSentTime = lastSentLocation.current?.time || 0;
+                const shouldSendHeartbeat = Date.now() - lastSentTime > 30000;
+
+                if (hasMoved || shouldSendHeartbeat) {
                     try {
                         fetchAddress(latitude, longitude);
                         await fetch("/api/location", {
@@ -71,7 +124,7 @@ export default function StudentDashboard() {
                                 accuracy,
                             }),
                         });
-                        lastSentLocation.current = { lat: latitude, lng: longitude };
+                        lastSentLocation.current = { lat: latitude, lng: longitude, time: Date.now() };
                     } catch (err) {
                         console.error("Failed to sync location:", err);
                     }
@@ -159,7 +212,66 @@ export default function StudentDashboard() {
                         <h1 className="text-2xl font-bold text-slate-900">Student Portal</h1>
                         <p className="text-slate-500 text-sm">Welcome back, {session?.user?.name}</p>
                     </div>
-                    <div className="relative">
+                    <div className="relative flex items-center gap-3">
+                        {/* Notification Bell */}
+                        <div className="relative mr-2">
+                            <button
+                                onClick={() => setShowNotifications(!showNotifications)}
+                                className="h-10 w-10 bg-white border border-slate-200 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-50 transition-colors"
+                            >
+                                <Bell className="h-5 w-5" />
+                                {unreadCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 h-5 w-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                                        {unreadCount}
+                                    </span>
+                                )}
+                            </button>
+
+                            {/* Notifications Dropdown */}
+                            {showNotifications && (
+                                <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-50 overflow-hidden">
+                                    <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
+                                        <p className="text-sm font-bold text-slate-900">Notifications</p>
+                                        <button onClick={() => setShowNotifications(false)} className="text-slate-400 hover:text-slate-600">
+                                            <X className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                    <div className="max-h-64 overflow-y-auto">
+                                        {notifications.length === 0 ? (
+                                            <div className="p-4 text-center text-xs text-slate-500 hidden-if-empty">
+                                                No notifications yet
+                                            </div>
+                                        ) : (
+                                            notifications.map((n) => (
+                                                <div
+                                                    key={n.id}
+                                                    className={cn(
+                                                        "p-3 border-b border-slate-50 hover:bg-slate-50 transition-colors cursor-pointer",
+                                                        n.isRead ? "opacity-60" : "bg-blue-50/30"
+                                                    )}
+                                                    onClick={() => !n.isRead && markAsRead(n.id)}
+                                                >
+                                                    <div className="flex items-start gap-3">
+                                                        <div className={cn("mt-1 h-2 w-2 rounded-full flex-shrink-0", n.isRead ? "bg-slate-300" : "bg-blue-600")} />
+                                                        <div className="flex-1">
+                                                            <p className={cn("text-xs font-bold", n.isRead ? "text-slate-600" : "text-blue-700")}>{n.title}</p>
+                                                            <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
+                                                            <p className="text-[10px] text-slate-400 mt-1">{new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                                                        </div>
+                                                        {!n.isRead && (
+                                                            <div className="text-blue-600" title="Mark as read">
+                                                                <Check className="h-3 w-3" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         <button
                             onClick={() => setShowProfileMenu(!showProfileMenu)}
                             className="h-10 w-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold hover:bg-blue-700 transition-colors"

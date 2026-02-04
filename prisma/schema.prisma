@@ -23,6 +23,8 @@ model User {
   activityLogs   ActivityLog[]
   locationLogs   LocationLog[]
   sessions       Session[]
+  notifications  Notification[]
+  pushSubscriptions PushSubscription[]
   studentProfile StudentProfile?
 }
 
@@ -104,4 +106,28 @@ enum Role {
   STUDENT
   TEACHER
   ADMIN
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([isRead])
+}
+
+model PushSubscription {
+  id        String   @id @default(cuid())
+  endpoint  String   @unique
+  keys      Json
+  createdAt DateTime @default(now())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

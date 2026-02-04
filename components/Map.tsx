@@ -4,6 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap, Polyline, CircleMarker 
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 import { useEffect, useRef, useState, useMemo } from "react";
+import { Bell, Check, Loader2 } from "lucide-react";
 
 // Fix for default marker icon - use CDN URLs
 const DefaultIcon = L.icon({
@@ -219,11 +220,82 @@ function MapMarkerWithLocation({ marker }: { marker: MarkerData }) {
                                 <span className="text-gray-400">🕒</span>
                                 <span className="text-gray-500">{marker.lastSeen}</span>
                             </div>
+
+                            {/* Notification Button */}
+                            <div className="pt-3 mt-3 border-t border-gray-100">
+                                <SendReminderButton studentId={marker.id} studentName={marker.name} />
+                            </div>
                         </div>
                     </div>
                 </Popup>
             </Marker>
         </>
+    );
+}
+
+function SendReminderButton({ studentId, studentName }: { studentId: string, studentName: string }) {
+    const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
+
+    const sendReminder = async () => {
+        setStatus("sending");
+        try {
+            console.log("Sending reminder to:", studentId);
+            const res = await fetch("/api/notifications", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userIds: [studentId],
+                    title: "Action Required",
+                    message: "The admin is requesting you to update your status or location."
+                }),
+            });
+
+            console.log("Response status:", res.status);
+
+            if (!res.ok) {
+                const errText = await res.text();
+                console.error("Notification failed:", res.status, errText);
+                throw new Error(`Failed: ${res.status} ${errText}`);
+            }
+
+            setStatus("sent");
+            setTimeout(() => setStatus("idle"), 3000);
+        } catch (error) {
+            console.error("Error sending reminder:", error);
+            setStatus("error");
+            setTimeout(() => setStatus("idle"), 3000);
+        }
+    };
+
+    if (status === "sent") {
+        return (
+            <button disabled className="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-emerald-100 text-emerald-700 rounded-lg text-xs font-bold transition-all">
+                <Check className="h-3 w-3" />
+                Reminder Sent
+            </button>
+        );
+    }
+
+    if (status === "sending") {
+        return (
+            <button disabled className="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-slate-100 text-slate-500 rounded-lg text-xs font-bold transition-all cursor-wait">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Sending...
+            </button>
+        );
+    }
+
+    return (
+        <button
+            onClick={(e) => {
+                e.stopPropagation();
+                sendReminder();
+            }}
+            className="w-full flex items-center justify-center gap-2 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-all"
+        >
+            <Bell className="h-3 w-3" />
+            Send Reminder
+        </button>
     );
 }
 

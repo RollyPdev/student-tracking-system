@@ -70,6 +70,10 @@ export async function GET() {
             },
         });
 
+        // Consider a student offline if no location update in the last 2 minutes
+        const OFFLINE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
+        const now = new Date();
+
         const formatted = latestLocations.map((u: any) => {
             const lastLoc = u.locationLogs[0];
             if (!lastLoc) return null; // Skip users with no logs
@@ -79,6 +83,11 @@ export async function GET() {
                 .reverse()
                 .map((l: any) => [l.lat, l.lng]);
 
+            // Calculate if the student is actually online based on last location timestamp
+            const lastUpdateTime = new Date(lastLoc.timestamp);
+            const timeSinceLastUpdate = now.getTime() - lastUpdateTime.getTime();
+            const isActuallyOnline = timeSinceLastUpdate < OFFLINE_THRESHOLD_MS && u.isSharing;
+
             return {
                 id: u.id,
                 name: u.name || "Unknown",
@@ -86,7 +95,7 @@ export async function GET() {
                 lng: lastLoc.lng,
                 timestamp: lastLoc.timestamp,
                 className: u.studentProfile?.class?.name || u.studentClass || "N/A",
-                isSharing: u.isSharing ?? false,
+                isSharing: isActuallyOnline,
                 image: u.image,
                 school: u.school,
                 history: history,

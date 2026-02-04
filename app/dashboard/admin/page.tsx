@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import MapWrapper from "@/components/MapWrapper";
-import { Users, Map as MapIcon, RefreshCw, Search, Filter, UserCog, LogOut, Settings, X, Pencil } from "lucide-react";
+import { Users, Map as MapIcon, RefreshCw, Search, Filter, UserCog, LogOut, Settings, X, Pencil, Bell, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserManagement from "@/components/UserManagement";
 
@@ -39,6 +39,12 @@ export default function AdminDashboard() {
     const [profileMessage, setProfileMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
     const [savingProfile, setSavingProfile] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+    // Broadcast State
+    const [showBroadcastModal, setShowBroadcastModal] = useState(false);
+    const [sendingBroadcast, setSendingBroadcast] = useState(false);
+    const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "" });
+    const [broadcastStatus, setBroadcastStatus] = useState<{ type: "success" | "error", text: string } | null>(null);
 
     const fetchLocations = async () => {
         try {
@@ -108,6 +114,44 @@ export default function AdminDashboard() {
         }
     };
 
+    const handleBroadcastSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setSendingBroadcast(true);
+        setBroadcastStatus(null);
+
+        try {
+            // Get all student IDs (or filter based on selection if we had one)
+            const allStudentIds = students.map(s => s.id);
+
+            if (allStudentIds.length === 0) {
+                throw new Error("No active students to message.");
+            }
+
+            const res = await fetch("/api/notifications", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    userIds: allStudentIds,
+                    title: broadcastForm.title,
+                    message: broadcastForm.message
+                }),
+            });
+
+            if (!res.ok) throw new Error("Failed to send broadcast");
+
+            setBroadcastStatus({ type: "success", text: `Sent to ${allStudentIds.length} students!` });
+            setTimeout(() => {
+                setShowBroadcastModal(false);
+                setBroadcastForm({ title: "", message: "" });
+                setBroadcastStatus(null);
+            }, 2000);
+        } catch (error: any) {
+            setBroadcastStatus({ type: "error", text: error.message });
+        } finally {
+            setSendingBroadcast(false);
+        }
+    };
+
     const markers = students.map((s) => ({
         id: s.id,
         name: s.name,
@@ -170,6 +214,15 @@ export default function AdminDashboard() {
                             List View
                         </button>
                     </div>
+
+                    {/* Broadcast Button */}
+                    <button
+                        onClick={() => setShowBroadcastModal(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-200"
+                    >
+                        <Bell className="h-4 w-4" />
+                        <span className="hidden md:inline">Broadcast</span>
+                    </button>
 
                     {/* User Management Button */}
                     <button
@@ -449,6 +502,101 @@ export default function AdminDashboard() {
                                     className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold transition-all disabled:opacity-50"
                                 >
                                     {savingProfile ? "Saving..." : "Save Changes"}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Broadcast Modal */}
+            {showBroadcastModal && (
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden">
+                        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-indigo-100 rounded-xl">
+                                    <Send className="h-5 w-5 text-indigo-600" />
+                                </div>
+                                <div>
+                                    <h2 className="text-lg font-bold text-slate-900">Broadcast Message</h2>
+                                    <p className="text-xs text-slate-500">Send to all {students.length} active students</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowBroadcastModal(false);
+                                    setBroadcastForm({ title: "", message: "" });
+                                    setBroadcastStatus(null);
+                                }}
+                                className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
+                            >
+                                <X className="h-5 w-5 text-slate-400" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleBroadcastSubmit} className="p-6 space-y-4">
+                            {broadcastStatus && (
+                                <div className={cn(
+                                    "p-4 rounded-xl text-sm font-medium",
+                                    broadcastStatus.type === "success" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
+                                )}>
+                                    {broadcastStatus.text}
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">Title</label>
+                                <input
+                                    required
+                                    type="text"
+                                    value={broadcastForm.title}
+                                    onChange={(e) => setBroadcastForm({ ...broadcastForm, title: e.target.value })}
+                                    placeholder="e.g., Important Announcement"
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">Message</label>
+                                <textarea
+                                    required
+                                    value={broadcastForm.message}
+                                    onChange={(e) => setBroadcastForm({ ...broadcastForm, message: e.target.value })}
+                                    placeholder="Type your message here..."
+                                    rows={4}
+                                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-4 focus:ring-indigo-50 focus:border-indigo-500 outline-none transition-all resize-none"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowBroadcastModal(false);
+                                        setBroadcastForm({ title: "", message: "" });
+                                        setBroadcastStatus(null);
+                                    }}
+                                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={sendingBroadcast || students.length === 0}
+                                    className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                                >
+                                    {sendingBroadcast ? (
+                                        <>
+                                            <RefreshCw className="h-4 w-4 animate-spin" />
+                                            Sending...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Send className="h-4 w-4" />
+                                            Send to All
+                                        </>
+                                    )}
                                 </button>
                             </div>
                         </form>
