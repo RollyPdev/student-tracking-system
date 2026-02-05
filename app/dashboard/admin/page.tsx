@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import MapWrapper from "@/components/MapWrapper";
 import { Users, Map as MapIcon, RefreshCw, Search, Filter, UserCog, LogOut, Settings, X, Pencil, Bell, Send } from "lucide-react";
@@ -45,12 +45,37 @@ export default function AdminDashboard() {
     const [sendingBroadcast, setSendingBroadcast] = useState(false);
     const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "" });
     const [broadcastStatus, setBroadcastStatus] = useState<{ type: "success" | "error", text: string } | null>(null);
+    const [alerts, setAlerts] = useState<{ id: string, title: string, message: string, type: 'info' | 'success' | 'warning' }[]>([]);
+    const prevStudentsRef = useRef<StudentLocation[]>([]);
+
+    const addAlert = (title: string, message: string, type: 'info' | 'success' | 'warning' = 'info') => {
+        const id = Math.random().toString(36).substring(7);
+        setAlerts(prev => [...prev, { id, title, message, type }]);
+        setTimeout(() => {
+            setAlerts(prev => prev.filter(a => a.id !== id));
+        }, 5000);
+    };
 
     const fetchLocations = async () => {
         try {
             const res = await fetch("/api/location");
             const data = await res.json();
             if (Array.isArray(data)) {
+                // Check for status changes
+                if (prevStudentsRef.current.length > 0) {
+                    data.forEach(newS => {
+                        const oldS = prevStudentsRef.current.find(s => s.id === newS.id);
+                        // Alert if student started sharing
+                        if (newS.isSharing && (!oldS || !oldS.isSharing)) {
+                            addAlert("Live Session Started", `${newS.name} is now sharing their location`, 'success');
+                        }
+                        // Alert if student stopped sharing
+                        else if (!newS.isSharing && oldS && oldS.isSharing) {
+                            addAlert("Live Session Ended", `${newS.name} stopped sharing location`, 'warning');
+                        }
+                    });
+                }
+                prevStudentsRef.current = data;
                 setStudents(data);
             }
             setLastRefreshed(new Date());
@@ -603,6 +628,40 @@ export default function AdminDashboard() {
                     </div>
                 </div>
             )}
+            {/* Alert Notifications */}
+            <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
+                {alerts.map(alert => (
+                    <div
+                        key={alert.id}
+                        className={cn(
+                            "pointer-events-auto flex items-start gap-4 p-4 rounded-2xl border shadow-2xl min-w-[320px] transition-all duration-500",
+                            "animate-in slide-in-from-right fade-in zoom-in-95",
+                            alert.type === 'success' ? "bg-white border-emerald-100 shadow-emerald-100/50" :
+                                alert.type === 'warning' ? "bg-white border-amber-100 shadow-amber-100/50" :
+                                    "bg-white border-blue-100"
+                        )}
+                    >
+                        <div className={cn(
+                            "p-2 rounded-xl flex-shrink-0",
+                            alert.type === 'success' ? "bg-emerald-100 text-emerald-600" :
+                                alert.type === 'warning' ? "bg-amber-100 text-amber-600" :
+                                    "bg-blue-100 text-blue-600"
+                        )}>
+                            <Bell className="h-5 w-5 animate-bounce" />
+                        </div>
+                        <div className="flex-1 pt-0.5">
+                            <h4 className="font-bold text-slate-900 text-sm">{alert.title}</h4>
+                            <p className="text-xs text-slate-500 mt-1">{alert.message}</p>
+                        </div>
+                        <button
+                            onClick={() => setAlerts(prev => prev.filter(a => a.id !== alert.id))}
+                            className="text-slate-400 hover:text-slate-600 transition-colors p-1"
+                        >
+                            <X className="h-4 w-4" />
+                        </button>
+                    </div>
+                ))}
+            </div>
         </div>
     );
 }
