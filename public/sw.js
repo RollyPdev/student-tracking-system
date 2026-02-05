@@ -1,14 +1,21 @@
 self.addEventListener('push', function (event) {
     if (event.data) {
         const data = event.data.json();
+
+        const isTyphoon = data.type === 'typhoon';
+
         const options = {
             body: data.body,
             icon: '/icon-192x192.png',
             badge: '/badge-72x72.png',
-            vibrate: [100, 50, 100],
+            vibrate: isTyphoon ? [500, 200, 500, 200, 500, 200, 1000] : [100, 50, 100],
+            requireInteraction: isTyphoon, // Keep alert on screen
+            renotify: isTyphoon,           // Alert again even if another is open
+            tag: isTyphoon ? 'typhoon-alert' : undefined,
             data: {
                 dateOfArrival: Date.now(),
-                primaryKey: '2'
+                primaryKey: '2',
+                type: data.type
             }
         };
         event.waitUntil(

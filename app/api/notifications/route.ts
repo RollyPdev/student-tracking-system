@@ -54,7 +54,7 @@ export async function POST(req: Request) {
     try {
         const body = await req.json();
         console.log("Notification POST body:", body);
-        const { userIds, title, message } = body; // userIds can be a single ID string or an array of strings
+        const { userIds, title, message, type } = body; // userIds can be a single ID string or an array of strings
 
         if (!title || !message) {
             return NextResponse.json({ error: "Title and message are required" }, { status: 400 });
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
             }
         });
 
-        const payload = JSON.stringify({ title, body: message });
+        const payload = JSON.stringify({ title, body: message, type });
 
         // Send parallel push notifications
         const pushPromises = subscriptions.map(sub => {

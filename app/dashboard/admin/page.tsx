@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import MapWrapper from "@/components/MapWrapper";
-import { Users, Map as MapIcon, RefreshCw, Search, Filter, UserCog, LogOut, Settings, X, Pencil, Bell, Send } from "lucide-react";
+import { Users, Map as MapIcon, RefreshCw, Search, Filter, UserCog, LogOut, Settings, X, Pencil, Bell, Send, TriangleAlert, Siren, CloudLightning, MoreHorizontal, LayoutList, Map as MapIcon2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import UserManagement from "@/components/UserManagement";
 
@@ -43,8 +43,12 @@ export default function AdminDashboard() {
     // Broadcast State
     const [showBroadcastModal, setShowBroadcastModal] = useState(false);
     const [sendingBroadcast, setSendingBroadcast] = useState(false);
-    const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "" });
+    const [broadcastForm, setBroadcastForm] = useState({ title: "", message: "", type: "normal" });
     const [broadcastStatus, setBroadcastStatus] = useState<{ type: "success" | "error", text: string } | null>(null);
+    const [showTyphoonModal, setShowTyphoonModal] = useState(false);
+    const [showToolsMenu, setShowToolsMenu] = useState(false);
+    const [weatherAutoMode, setWeatherAutoMode] = useState(false);
+    const lastWeatherAlertRef = useRef<number>(0);
     const [alerts, setAlerts] = useState<{ id: string, title: string, message: string, type: 'info' | 'success' | 'warning' }[]>([]);
     const prevStudentsRef = useRef<StudentLocation[]>([]);
 
@@ -92,6 +96,42 @@ export default function AdminDashboard() {
         const interval = setInterval(fetchLocations, 3000);
         return () => clearInterval(interval);
     }, []);
+
+    // Weather Polling
+    useEffect(() => {
+        if (!weatherAutoMode) return;
+
+        const checkWeather = async () => {
+            try {
+                const res = await fetch("/api/weather/alert");
+                const alerts = await res.json();
+
+                if (Array.isArray(alerts) && alerts.length > 0) {
+                    const typhoonAlert = alerts[0]; // Take the first one
+                    const now = Date.now();
+
+                    // Only trigger if we haven't sent one in the last 24 hours to avoid spam
+                    // or if it's the very first time detecting it
+                    if (now - lastWeatherAlertRef.current > 24 * 60 * 60 * 1000) {
+                        setBroadcastForm({
+                            title: `AUTOMATED ALERT: ${typhoonAlert.event || "Severe Weather Detected"}`,
+                            message: `PAGASA/Weather Update: ${typhoonAlert.description || "Severe weather conditions detected near your area."} Please take necessary precautions.`,
+                            type: "typhoon"
+                        });
+                        setShowTyphoonModal(true);
+                        addAlert("Automatic Weather Trigger", "Severe weather detected! Please confirm broadcast.", "warning");
+                        lastWeatherAlertRef.current = now;
+                    }
+                }
+            } catch (err) {
+                console.error("Weather check failed:", err);
+            }
+        };
+
+        checkWeather(); // Check immediately on enable
+        const interval = setInterval(checkWeather, 10 * 60 * 1000); // Every 10 mins
+        return () => clearInterval(interval);
+    }, [weatherAutoMode]);
 
     useEffect(() => {
         if (session?.user) {
@@ -158,16 +198,19 @@ export default function AdminDashboard() {
                 body: JSON.stringify({
                     userIds: allStudentIds,
                     title: broadcastForm.title,
-                    message: broadcastForm.message
+                    message: broadcastForm.message,
+                    type: broadcastForm.type
                 }),
             });
 
             if (!res.ok) throw new Error("Failed to send broadcast");
 
             setBroadcastStatus({ type: "success", text: `Sent to ${allStudentIds.length} students!` });
+            setBroadcastStatus({ type: "success", text: `Sent to ${allStudentIds.length} students!` });
             setTimeout(() => {
                 setShowBroadcastModal(false);
-                setBroadcastForm({ title: "", message: "" });
+                setShowTyphoonModal(false);
+                setBroadcastForm({ title: "", message: "", type: "normal" });
                 setBroadcastStatus(null);
             }, 2000);
         } catch (error: any) {
@@ -212,51 +255,119 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                    <div className="hidden md:flex items-center px-4 py-2 bg-slate-100 rounded-full text-xs font-semibold text-slate-600 gap-2">
-                        <RefreshCw className={cn("h-3 w-3", loading && "animate-spin")} />
-                        Last update: {mounted ? lastRefreshed.toLocaleTimeString() : "--:--:--"}
-                    </div>
-
-                    {/* View Toggle */}
-                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                <div className="flex items-center gap-3">
+                    {/* View Toggle - Compact */}
+                    <div className="hidden md:flex bg-slate-100 p-1 rounded-xl">
                         <button
                             onClick={() => setView("map")}
                             className={cn(
-                                "px-4 py-2 rounded-lg text-sm font-bold transition-all",
-                                view === "map" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                "p-2 rounded-lg transition-all",
+                                view === "map" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
                             )}
+                            title="Map View"
                         >
-                            Map View
+                            <MapIcon2 className="h-4 w-4" />
                         </button>
                         <button
                             onClick={() => setView("list")}
                             className={cn(
-                                "px-4 py-2 rounded-lg text-sm font-bold transition-all",
-                                view === "list" ? "bg-white text-blue-600 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                                "p-2 rounded-lg transition-all",
+                                view === "list" ? "bg-white text-blue-600 shadow-sm" : "text-slate-400 hover:text-slate-600"
                             )}
+                            title="List View"
                         >
-                            List View
+                            <LayoutList className="h-4 w-4" />
                         </button>
                     </div>
 
-                    {/* Broadcast Button */}
+                    {/* Typhoon Alert Button - Compact but distinctive */}
                     <button
-                        onClick={() => setShowBroadcastModal(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-indigo-200"
+                        onClick={() => {
+                            setBroadcastForm({
+                                title: "TYPHOON WARNING SIGNAL",
+                                message: "Please seek shelter immediately. Heavy rains and strong winds expected.",
+                                type: "typhoon"
+                            });
+                            setShowTyphoonModal(true);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-xl font-bold text-xs transition-all border border-red-200"
+                        title="Emergency Typhoon Alert"
                     >
-                        <Bell className="h-4 w-4" />
-                        <span className="hidden md:inline">Broadcast</span>
+                        <Siren className="h-4 w-4 animate-pulse" />
+                        <span className="hidden xl:inline">Emergency Alert</span>
                     </button>
 
-                    {/* User Management Button */}
-                    <button
-                        onClick={() => setShowUserManagement(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-sm transition-all shadow-lg shadow-purple-200"
-                    >
-                        <UserCog className="h-4 w-4" />
-                        <span className="hidden md:inline">Manage Users</span>
-                    </button>
+                    {/* Quick Tools Dropdown */}
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowToolsMenu(!showToolsMenu)}
+                            className="flex items-center gap-2 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-all"
+                        >
+                            <Settings className="h-4 w-4" />
+                            <span className="hidden md:inline">Tools</span>
+                        </button>
+
+                        {showToolsMenu && (
+                            <>
+                                <div className="fixed inset-0 z-[1001]" onClick={() => setShowToolsMenu(false)} />
+                                <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 z-[1002] animate-in fade-in zoom-in-95">
+                                    <div className="px-3 py-2 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                        Quick Actions
+                                    </div>
+
+                                    <button
+                                        onClick={() => {
+                                            setShowToolsMenu(false);
+                                            setShowBroadcastModal(true);
+                                        }}
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                    >
+                                        <Bell className="h-4 w-4 text-indigo-600" />
+                                        Broadcast Message
+                                    </button>
+
+                                    <button
+                                        onClick={() => {
+                                            setShowToolsMenu(false);
+                                            setShowUserManagement(true);
+                                        }}
+                                        className="w-full flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                                    >
+                                        <UserCog className="h-4 w-4 text-purple-600" />
+                                        Manage Users
+                                    </button>
+
+                                    <div className="my-2 border-t border-slate-100" />
+
+                                    <div className="px-4 py-2">
+                                        <button
+                                            onClick={() => setWeatherAutoMode(!weatherAutoMode)}
+                                            className={cn(
+                                                "w-full flex items-center justify-between p-2 rounded-xl text-xs font-bold transition-all border",
+                                                weatherAutoMode
+                                                    ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                                                    : "bg-slate-50 text-slate-400 border-slate-200"
+                                            )}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                <CloudLightning className="h-3 w-3" />
+                                                <span>Auto-Weather</span>
+                                            </div>
+                                            <div className={cn(
+                                                "w-8 h-4 rounded-full relative transition-colors",
+                                                weatherAutoMode ? "bg-emerald-500" : "bg-slate-300"
+                                            )}>
+                                                <div className={cn(
+                                                    "absolute top-0.5 w-3 h-3 bg-white rounded-full transition-transform shadow-sm",
+                                                    weatherAutoMode ? "left-4.5" : "left-0.5"
+                                                )} />
+                                            </div>
+                                        </button>
+                                    </div>
+                                </div>
+                            </>
+                        )}
+                    </div>
 
                     {/* Profile Menu */}
                     <div className="relative">
@@ -551,7 +662,7 @@ export default function AdminDashboard() {
                             <button
                                 onClick={() => {
                                     setShowBroadcastModal(false);
-                                    setBroadcastForm({ title: "", message: "" });
+                                    setBroadcastForm({ title: "", message: "", type: "normal" });
                                     setBroadcastStatus(null);
                                 }}
                                 className="p-2 hover:bg-slate-100 rounded-xl transition-colors"
@@ -599,7 +710,7 @@ export default function AdminDashboard() {
                                     type="button"
                                     onClick={() => {
                                         setShowBroadcastModal(false);
-                                        setBroadcastForm({ title: "", message: "" });
+                                        setBroadcastForm({ title: "", message: "", type: "normal" });
                                         setBroadcastStatus(null);
                                     }}
                                     className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all"
@@ -628,6 +739,105 @@ export default function AdminDashboard() {
                     </div>
                 </div>
             )}
+
+            {/* Typhoon Modal */}
+            {showTyphoonModal && (
+                <div className="fixed inset-0 bg-red-900/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border-4 border-red-500 animate-in zoom-in-95 duration-300">
+                        <div className="p-6 bg-red-50 border-b border-red-100 flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <div className="p-3 bg-red-600 rounded-full animate-bounce">
+                                    <TriangleAlert className="h-6 w-6 text-white" />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-black text-red-700 uppercase tracking-wide">Emergency Alert</h2>
+                                    <p className="text-xs text-red-600 font-bold">Sending to ALL students with HIGH PRIORITY</p>
+                                </div>
+                            </div>
+                            <button
+                                onClick={() => {
+                                    setShowTyphoonModal(false);
+                                    setBroadcastForm({ title: "", message: "", type: "normal" });
+                                }}
+                                className="p-2 hover:bg-red-100 rounded-xl transition-colors"
+                            >
+                                <X className="h-5 w-5 text-red-400" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleBroadcastSubmit} className="p-6 space-y-4">
+                            <div className="bg-red-50 p-4 rounded-xl border border-red-100 mb-4">
+                                <p className="text-xs font-medium text-red-800 flex gap-2">
+                                    <Siren className="h-4 w-4" />
+                                    This will trigger a loud alarm on student devices.
+                                </p>
+                            </div>
+
+                            {broadcastStatus && (
+                                <div className={cn(
+                                    "p-4 rounded-xl text-sm font-medium",
+                                    broadcastStatus.type === "success" ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"
+                                )}>
+                                    {broadcastStatus.text}
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">Alert Title</label>
+                                <input
+                                    required
+                                    type="text"
+                                    value={broadcastForm.title}
+                                    onChange={(e) => setBroadcastForm({ ...broadcastForm, title: e.target.value })}
+                                    className="w-full px-4 py-3 bg-red-50 border-2 border-red-200 rounded-xl focus:ring-4 focus:ring-red-100 focus:border-red-500 outline-none transition-all font-bold text-red-900 placeholder:text-red-300"
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-sm font-bold text-slate-700">Message</label>
+                                <textarea
+                                    required
+                                    value={broadcastForm.message}
+                                    onChange={(e) => setBroadcastForm({ ...broadcastForm, message: e.target.value })}
+                                    rows={4}
+                                    className="w-full px-4 py-3 bg-red-50 border-2 border-red-200 rounded-xl focus:ring-4 focus:ring-red-100 focus:border-red-500 outline-none transition-all resize-none font-medium text-red-900"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setShowTyphoonModal(false);
+                                        setBroadcastForm({ title: "", message: "", type: "normal" });
+                                    }}
+                                    className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={sendingBroadcast}
+                                    className="flex-1 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-red-200"
+                                >
+                                    {sendingBroadcast ? (
+                                        <>
+                                            <RefreshCw className="h-4 w-4 animate-spin" />
+                                            Sending Alert...
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Siren className="h-4 w-4" />
+                                            SEND ALERT
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
             {/* Alert Notifications */}
             <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none">
                 {alerts.map(alert => (

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
-import { MapPin, Power, Cloud, Navigation, History, Shield, LogOut, User, Bell, X, Check } from "lucide-react";
+import { MapPin, Power, Cloud, Navigation, History, Shield, LogOut, User, Bell, X, Check, TriangleAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default function StudentDashboard() {
@@ -20,6 +20,46 @@ export default function StudentDashboard() {
     const [notifications, setNotifications] = useState<any[]>([]);
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [emergencyAlert, setEmergencyAlert] = useState<{ title: string, message: string } | null>(null);
+    const audioContextRef = useRef<any>(null);
+
+    const playSiren = () => {
+        try {
+            const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+            if (!AudioContext) return;
+
+            if (!audioContextRef.current) {
+                audioContextRef.current = new AudioContext();
+            }
+            const ctx = audioContextRef.current;
+            if (ctx.state === 'suspended') ctx.resume();
+
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            osc.type = 'sawtooth';
+            const now = ctx.currentTime;
+
+            // Urgent siren pattern
+            osc.frequency.setValueAtTime(600, now);
+            osc.frequency.linearRampToValueAtTime(900, now + 0.3);
+            osc.frequency.linearRampToValueAtTime(600, now + 0.6);
+            osc.frequency.linearRampToValueAtTime(900, now + 0.9);
+            osc.frequency.linearRampToValueAtTime(600, now + 1.2);
+            osc.frequency.linearRampToValueAtTime(900, now + 1.5);
+
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.linearRampToValueAtTime(0, now + 2.0);
+
+            osc.start(now);
+            osc.stop(now + 2.0);
+        } catch (e) {
+            console.error(e);
+        }
+    };
 
     // Fetch notifications periodically
     useEffect(() => {
@@ -30,6 +70,18 @@ export default function StudentDashboard() {
                     const data = await res.json();
                     setNotifications(data);
                     setUnreadCount(data.filter((n: any) => !n.isRead).length);
+
+                    // Check for emergency
+                    const latestUnread = data.find((n: any) => !n.isRead &&
+                        (n.title.toUpperCase().includes("TYPHOON") || n.message.toUpperCase().includes("EMERGENCY")));
+
+                    if (latestUnread) {
+                        setEmergencyAlert({
+                            title: latestUnread.title,
+                            message: latestUnread.message
+                        });
+                        playSiren();
+                    }
                 }
             } catch (err) {
                 console.error("Failed to fetch notifications:", err);
@@ -420,6 +472,29 @@ export default function StudentDashboard() {
                     </div>
                 )}
             </div>
+
+            {/* Emergency Overlay */}
+            {emergencyAlert && (
+                <div className="fixed inset-0 z-[9999] bg-red-600 animate-pulse flex flex-col items-center justify-center p-8 text-white text-center">
+                    <div className="bg-white p-6 rounded-full mb-8 animate-bounce">
+                        <TriangleAlert className="h-16 w-16 text-red-600" />
+                    </div>
+                    <h1 className="text-4xl md:text-6xl font-black uppercase mb-4 tracking-tighter">{emergencyAlert.title}</h1>
+                    <p className="text-xl md:text-2xl font-bold max-w-2xl mb-12">{emergencyAlert.message}</p>
+
+                    <button
+                        onClick={() => {
+                            setEmergencyAlert(null);
+                            if (audioContextRef.current) audioContextRef.current.close();
+                            audioContextRef.current = null;
+                        }}
+                        className="bg-white text-red-600 px-8 py-4 rounded-full font-black text-xl hover:bg-red-50 transition-colors shadow-2xl"
+                    >
+                        I AM SAFE - DISMISS
+                    </button>
+                    <p className="fixed bottom-8 text-sm opacity-80 font-medium">Please follow local evacuation guidelines immediately.</p>
+                </div>
+            )}
         </div>
     );
 }
